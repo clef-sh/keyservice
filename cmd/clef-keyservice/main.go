@@ -29,12 +29,20 @@ import (
 	"google.golang.org/grpc"
 )
 
+var version = "dev"
+
 func main() {
 	addr := flag.String("addr", "127.0.0.1:0", "Listen address (host:port). Use :0 for random port.")
 	token := flag.String("token", "", "Clef Cloud bearer token (required)")
 	endpoint := flag.String("endpoint", "https://api.clef.sh", "Clef Cloud API base URL")
 	verbose := flag.Bool("verbose", false, "Enable debug logging to stderr")
+	showVersion := flag.Bool("version", false, "Print version and exit")
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Println(version)
+		os.Exit(0)
+	}
 
 	if *token == "" {
 		fmt.Fprintln(os.Stderr, "error: --token is required")
