@@ -23,9 +23,9 @@ import (
 	"os/signal"
 	"syscall"
 
-	pb "github.com/getsops/sops/v3/keyservice"
 	"github.com/clef-sh/keyservice/internal/cloud"
 	"github.com/clef-sh/keyservice/internal/proxy"
+	pb "github.com/getsops/sops/v3/keyservice"
 	"google.golang.org/grpc"
 )
 

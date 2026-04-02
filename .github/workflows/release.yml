@@ -1,0 +1,193 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Run tests
+        run: make test
+
+  build:
+    needs: test
+    strategy:
+      matrix:
+        include:
+          - platform: darwin-arm64
+            goos: darwin
+            goarch: arm64
+            os: macos-latest
+            bin_name: clef-keyservice
+          - platform: darwin-x64
+            goos: darwin
+            goarch: amd64
+            os: macos-latest
+            bin_name: clef-keyservice
+          - platform: linux-x64
+            goos: linux
+            goarch: amd64
+            os: ubuntu-latest
+            bin_name: clef-keyservice
+          - platform: linux-arm64
+            goos: linux
+            goarch: arm64
+            os: ubuntu-latest
+            bin_name: clef-keyservice
+          - platform: win32-x64
+            goos: windows
+            goarch: amd64
+            os: ubuntu-latest
+            bin_name: clef-keyservice.exe
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build binary
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          LDFLAGS="-s -w -X main.version=${VERSION}"
+          go build -ldflags "${LDFLAGS}" -o "${{ matrix.bin_name }}" ./cmd/clef-keyservice
+
+      - name: Generate checksum
+        shell: bash
+        run: shasum -a 256 "${{ matrix.bin_name }}" > "${{ matrix.bin_name }}.sha256"
+
+      - name: Upload binary to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ASSET="${{ matrix.bin_name }}"
+          # Rename with platform suffix for release (keep .exe for windows)
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            RELEASE_NAME="clef-keyservice-${{ matrix.platform }}.exe"
+          else
+            RELEASE_NAME="clef-keyservice-${{ matrix.platform }}"
+          fi
+          cp "$ASSET" "$RELEASE_NAME"
+          shasum -a 256 "$RELEASE_NAME" > "${RELEASE_NAME}.sha256"
+          gh release upload "${{ github.ref_name }}" \
+            "$RELEASE_NAME" \
+            "${RELEASE_NAME}.sha256" \
+            --clobber
+
+  publish-npm:
+    needs: build
+    strategy:
+      matrix:
+        include:
+          - platform: darwin-arm64
+            os: macos-latest
+            bin_name: clef-keyservice
+          - platform: darwin-x64
+            os: macos-latest
+            bin_name: clef-keyservice
+          - platform: linux-x64
+            os: ubuntu-latest
+            bin_name: clef-keyservice
+          - platform: linux-arm64
+            os: ubuntu-24.04-arm
+            bin_name: clef-keyservice
+          - platform: win32-x64
+            os: windows-latest
+            bin_name: clef-keyservice.exe
+
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      id-token: write
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Download release binary
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          if [ "${{ matrix.platform }}" = "win32-x64" ]; then
+            ASSET="clef-keyservice-${{ matrix.platform }}.exe"
+          else
+            ASSET="clef-keyservice-${{ matrix.platform }}"
+          fi
+          gh release download "${{ github.ref_name }}" \
+            --pattern "$ASSET" \
+            --pattern "${ASSET}.sha256" \
+            --dir "platforms/keyservice-${{ matrix.platform }}/bin"
+
+          # Rename to expected bin name
+          mv "platforms/keyservice-${{ matrix.platform }}/bin/$ASSET" \
+             "platforms/keyservice-${{ matrix.platform }}/bin/${{ matrix.bin_name }}"
+          chmod +x "platforms/keyservice-${{ matrix.platform }}/bin/${{ matrix.bin_name }}"
+
+      - name: Verify checksum
+        run: |
+          cd "platforms/keyservice-${{ matrix.platform }}/bin"
+          if [ "${{ matrix.platform }}" = "win32-x64" ]; then
+            ASSET="clef-keyservice-${{ matrix.platform }}.exe"
+          else
+            ASSET="clef-keyservice-${{ matrix.platform }}"
+          fi
+          EXPECTED=$(cut -d' ' -f1 "${ASSET}.sha256")
+          ACTUAL=$(shasum -a 256 "${{ matrix.bin_name }}" | cut -d' ' -f1)
+          if [ "$EXPECTED" != "$ACTUAL" ]; then
+            echo "::error::Checksum mismatch: expected=$EXPECTED actual=$ACTUAL"
+            exit 1
+          fi
+          echo "Checksum OK: $ACTUAL"
+          rm -f "${ASSET}.sha256"
+
+      - name: Verify binary runs
+        if: matrix.platform != 'linux-arm64' || runner.arch == 'ARM64'
+        run: |
+          BIN="platforms/keyservice-${{ matrix.platform }}/bin/${{ matrix.bin_name }}"
+          "$BIN" --version || "$BIN" --help || true
+
+      - name: Stamp version into package.json
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          cd "platforms/keyservice-${{ matrix.platform }}"
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf-8'));
+            pkg.version = '${VERSION}';
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+
+      - name: Publish to npm
+        working-directory: platforms/keyservice-${{ matrix.platform }}
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

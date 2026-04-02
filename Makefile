@@ -1,4 +1,4 @@
-.PHONY: proto build build-all test clean
+.PHONY: proto build build-all test fmt clean
 
 BINARY := clef-keyservice
 VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
@@ -25,6 +25,9 @@ build-all:
 
 test:
 	go test ./...
+
+fmt:
+	gofmt -w .
 
 clean:
 	rm -rf bin/

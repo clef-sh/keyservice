@@ -1,0 +1,26 @@
+{
+  "name": "@clef-sh/keyservice-win32-x64",
+  "version": "0.0.0",
+  "description": "Bundled clef-keyservice binary for Windows x64",
+  "os": [
+    "win32"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "main": "bin/clef-keyservice.exe",
+  "files": [
+    "README.md",
+    "bin/clef-keyservice.exe",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/clef-sh/keyservice"
+  },
+  "license": "BSL-1.1"
+}

@@ -4,13 +4,13 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"log/slog"
 
-	pb "github.com/getsops/sops/v3/keyservice"
 	"github.com/clef-sh/keyservice/internal/cloud"
+	pb "github.com/getsops/sops/v3/keyservice"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -25,6 +25,7 @@ func testServer(t *testing.T, handler http.HandlerFunc) *Server {
 }
 
 type discardWriter struct{}
+
 func (d *discardWriter) Write(p []byte) (int, error) { return len(p), nil }
 
 func kmsEncryptHandler(t *testing.T) http.HandlerFunc {

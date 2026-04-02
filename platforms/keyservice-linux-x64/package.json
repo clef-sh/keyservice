@@ -1,0 +1,26 @@
+{
+  "name": "@clef-sh/keyservice-linux-x64",
+  "version": "0.0.0",
+  "description": "Bundled clef-keyservice binary for Linux x64",
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "main": "bin/clef-keyservice",
+  "files": [
+    "README.md",
+    "bin/clef-keyservice",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/clef-sh/keyservice"
+  },
+  "license": "BSL-1.1"
+}
