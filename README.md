@@ -1,4 +1,4 @@
-# clef-keyservice
+# clef-keyservice (multiple platforms)
 
 A standalone gRPC key service that implements the [SOPS KeyService protocol](https://github.com/getsops/sops). It proxies AWS KMS encrypt/decrypt operations through the Clef Cloud HTTPS API, allowing developers to use Cloud-managed KMS keys without local AWS credentials.
 
