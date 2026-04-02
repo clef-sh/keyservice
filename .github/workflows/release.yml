@@ -166,14 +166,11 @@ jobs:
              "platforms/keyservice-${{ matrix.platform }}/bin/${{ matrix.bin_name }}"
           chmod +x "platforms/keyservice-${{ matrix.platform }}/bin/${{ matrix.bin_name }}"
 
-      - name: Verify checksum
+      - name: Verify checksum (Unix)
+        if: runner.os != 'Windows'
         run: |
           cd "platforms/keyservice-${{ matrix.platform }}/bin"
-          if [ "${{ matrix.platform }}" = "win32-x64" ]; then
-            ASSET="clef-keyservice-${{ matrix.platform }}.exe"
-          else
-            ASSET="clef-keyservice-${{ matrix.platform }}"
-          fi
+          ASSET="clef-keyservice-${{ matrix.platform }}"
           EXPECTED=$(cut -d' ' -f1 "${ASSET}.sha256")
           ACTUAL=$(shasum -a 256 "${{ matrix.bin_name }}" | cut -d' ' -f1)
           if [ "$EXPECTED" != "$ACTUAL" ]; then
@@ -182,6 +179,21 @@ jobs:
           fi
           echo "Checksum OK: $ACTUAL"
           rm -f "${ASSET}.sha256"
+
+      - name: Verify checksum (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $dir = "platforms/keyservice-${{ matrix.platform }}/bin"
+          $asset = "clef-keyservice-${{ matrix.platform }}.exe"
+          $expected = (Get-Content "$dir/${asset}.sha256").Split(" ")[0]
+          $actual = (Get-FileHash "$dir/${{ matrix.bin_name }}" -Algorithm SHA256).Hash.ToLower()
+          if ($expected -ne $actual) {
+            Write-Error "Checksum mismatch: expected=$expected actual=$actual"
+            exit 1
+          }
+          Write-Output "Checksum OK: $actual"
+          Remove-Item "$dir/${asset}.sha256"
 
       - name: Verify binary runs
         if: matrix.platform != 'linux-arm64' || runner.arch == 'ARM64'
