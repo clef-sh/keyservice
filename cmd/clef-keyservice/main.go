@@ -44,8 +44,12 @@ func main() {
 		os.Exit(0)
 	}
 
+	// Fall back to CLEF_CLOUD_TOKEN env var (preferred by CLI — avoids token in /proc/<pid>/cmdline)
 	if *token == "" {
-		fmt.Fprintln(os.Stderr, "error: --token is required")
+		*token = os.Getenv("CLEF_CLOUD_TOKEN")
+	}
+	if *token == "" {
+		fmt.Fprintln(os.Stderr, "error: --token or CLEF_CLOUD_TOKEN is required")
 		os.Exit(1)
 	}
 
