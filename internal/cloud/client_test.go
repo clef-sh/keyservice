@@ -44,8 +44,10 @@ func TestEncrypt_Success(t *testing.T) {
 			t.Errorf("unexpected plaintext: %s", string(decoded))
 		}
 
-		resp := EncryptResponse{
-			Ciphertext: base64.StdEncoding.EncodeToString(expectedCiphertext),
+		resp := map[string]interface{}{
+			"data": map[string]string{
+				"ciphertext": base64.StdEncoding.EncodeToString(expectedCiphertext),
+			},
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(resp)
@@ -79,8 +81,10 @@ func TestDecrypt_Success(t *testing.T) {
 			t.Errorf("unexpected key ARN: %s", req.KeyARN)
 		}
 
-		resp := DecryptResponse{
-			Plaintext: base64.StdEncoding.EncodeToString(expectedPlaintext),
+		resp := map[string]interface{}{
+			"data": map[string]string{
+				"plaintext": base64.StdEncoding.EncodeToString(expectedPlaintext),
+			},
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(resp)
@@ -148,7 +152,7 @@ func TestEncrypt_NonJSONError(t *testing.T) {
 func TestEncrypt_InvalidBase64Response(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(EncryptResponse{Ciphertext: "not-valid-base64!!!"})
+		json.NewEncoder(w).Encode(map[string]interface{}{"data": map[string]string{"ciphertext": "not-valid-base64!!!"}})
 	}))
 	defer server.Close()
 
@@ -162,7 +166,7 @@ func TestEncrypt_InvalidBase64Response(t *testing.T) {
 func TestDecrypt_InvalidBase64Response(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(DecryptResponse{Plaintext: "not-valid-base64!!!"})
+		json.NewEncoder(w).Encode(map[string]interface{}{"data": map[string]string{"plaintext": "not-valid-base64!!!"}})
 	}))
 	defer server.Close()
 

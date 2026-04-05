@@ -30,8 +30,10 @@ func (d *discardWriter) Write(p []byte) (int, error) { return len(p), nil }
 
 func kmsEncryptHandler(t *testing.T) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		resp := cloud.EncryptResponse{
-			Ciphertext: base64.StdEncoding.EncodeToString([]byte("wrapped-dek")),
+		resp := map[string]interface{}{
+			"data": map[string]string{
+				"ciphertext": base64.StdEncoding.EncodeToString([]byte("wrapped-dek")),
+			},
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(resp)
@@ -40,8 +42,10 @@ func kmsEncryptHandler(t *testing.T) http.HandlerFunc {
 
 func kmsDecryptHandler(t *testing.T) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		resp := cloud.DecryptResponse{
-			Plaintext: base64.StdEncoding.EncodeToString([]byte("unwrapped-dek")),
+		resp := map[string]interface{}{
+			"data": map[string]string{
+				"plaintext": base64.StdEncoding.EncodeToString([]byte("unwrapped-dek")),
+			},
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(resp)

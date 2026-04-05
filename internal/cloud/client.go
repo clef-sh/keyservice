@@ -36,8 +36,11 @@ type EncryptRequest struct {
 }
 
 // EncryptResponse is returned by the Cloud KMS encrypt endpoint.
+// The Cloud API wraps responses in a { data, message, success } envelope.
 type EncryptResponse struct {
-	Ciphertext string `json:"ciphertext"` // base64-encoded
+	Data struct {
+		Ciphertext string `json:"ciphertext"` // base64-encoded
+	} `json:"data"`
 }
 
 // DecryptRequest is the payload sent to the Cloud KMS decrypt endpoint.
@@ -48,7 +51,9 @@ type DecryptRequest struct {
 
 // DecryptResponse is returned by the Cloud KMS decrypt endpoint.
 type DecryptResponse struct {
-	Plaintext string `json:"plaintext"` // base64-encoded
+	Data struct {
+		Plaintext string `json:"plaintext"` // base64-encoded
+	} `json:"data"`
 }
 
 // ErrorResponse is returned on failure.
@@ -69,7 +74,7 @@ func (c *Client) Encrypt(keyARN string, plaintext []byte) ([]byte, error) {
 		return nil, fmt.Errorf("cloud encrypt: %w", err)
 	}
 
-	ciphertext, err := base64.StdEncoding.DecodeString(resp.Ciphertext)
+	ciphertext, err := base64.StdEncoding.DecodeString(resp.Data.Ciphertext)
 	if err != nil {
 		return nil, fmt.Errorf("cloud encrypt: invalid base64 response: %w", err)
 	}
@@ -89,7 +94,7 @@ func (c *Client) Decrypt(keyARN string, ciphertext []byte) ([]byte, error) {
 		return nil, fmt.Errorf("cloud decrypt: %w", err)
 	}
 
-	plaintext, err := base64.StdEncoding.DecodeString(resp.Plaintext)
+	plaintext, err := base64.StdEncoding.DecodeString(resp.Data.Plaintext)
 	if err != nil {
 		return nil, fmt.Errorf("cloud decrypt: invalid base64 response: %w", err)
 	}
