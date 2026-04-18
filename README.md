@@ -103,6 +103,25 @@ If a raw `pkcs11:` URI arrives in `KmsKey.arn` (bypassing SOPS — e.g. via `grp
 | AWS CloudHSM | `/opt/cloudhsm/lib/libcloudhsm_pkcs11.so` | cluster certs under `/opt/cloudhsm/etc/` |
 | Nitrokey / OpenSC | `/usr/lib/opensc-pkcs11.so` | PC/SC daemon running |
 
+## Network HSMs and mTLS
+
+Network-attached HSMs (Thales Luna SA, AWS CloudHSM, remote YubiHSM via HTTPS connector, Securosys, Utimaco) typically authenticate the client with TLS client certificates. **Cert handling is entirely the vendor PKCS#11 library's responsibility** — clef-keyservice `dlopen`s the library and calls `C_*`; the library opens its own TCP connection, reads its own config file, presents the client cert, and validates the server cert. There is no TLS code in this binary and none is needed.
+
+The user supplies cert paths to the vendor library through its config file, selected by a vendor-specific env variable passed through to this process alongside `CLEF_PKCS11_MODULE`:
+
+| Vendor | Config file | Cert fields (inside the config) |
+|---|---|---|
+| Thales Luna | `Chrystoki.conf` via `ChrystokiConfigurationPath` | `[LunaSA Client]` → `ClientCertFile`, `ClientPrivKeyFile`, `ServerCAFile` |
+| AWS CloudHSM | `/opt/cloudhsm/etc/cloudhsm-pkcs11.cfg` | `customerCA.crt` under `/opt/cloudhsm/etc/`, configured once via `configure-pkcs11` |
+| YubiHSM2 | `yubihsm_pkcs11.conf` via `YUBIHSM_PKCS11_CONF` | `connector = https://...`, `cacert`, optional `cert`/`key` for client auth |
+| Securosys CloudsHSM | `sb_pkcs11.cfg` via `SB_PKCS11_CFG` | `TLS_CLIENT_CERT`, `TLS_CLIENT_KEY`, `TLS_CA_BUNDLE` |
+
+If a vendor ships a library that does not read cert paths from its own config — file an issue. There is no provision on our side to inject them.
+
+### Keyservice bind address
+
+The keyservice gRPC server binds to `127.0.0.1` by default and is expected to stay there — it is a short-lived local IPC sidecar spawned by the Clef CLI, not a network-reachable daemon. The gRPC channel has no TLS and no authentication. If `--addr` is set to a non-loopback address, a warning is logged at startup; exposing the keyservice off-host is unsupported and insecure.
+
 ## Provisioning a wrap keypair (SoftHSM2 example)
 
 ```bash

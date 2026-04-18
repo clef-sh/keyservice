@@ -86,6 +86,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	if tcpAddr, ok := lis.Addr().(*net.TCPAddr); ok && !tcpAddr.IP.IsLoopback() {
+		logger.Warn("keyservice bound to non-loopback address — unsupported, no TLS/auth on the gRPC channel",
+			"addr", tcpAddr.String())
+	}
+
 	srv := grpc.NewServer()
 	pb.RegisterKeyServiceServer(srv, proxy.NewServer(backend, logger))
 
