@@ -19,5 +19,22 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Run tests
+      - name: Run unit tests
         run: make test
+
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Install SoftHSM2 and OpenSC
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y softhsm2 opensc
+
+      - name: Run SoftHSM2 integration test
+        run: make test-integration

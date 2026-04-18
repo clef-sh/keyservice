@@ -4,6 +4,7 @@ go 1.24.0
 
 require (
 	github.com/getsops/sops/v3 v3.9.4
+	github.com/miekg/pkcs11 v1.1.2
 	google.golang.org/grpc v1.72.0
 )
 

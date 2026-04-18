@@ -1,17 +1,26 @@
-// clef-keyservice is a SOPS-compatible gRPC key service that proxies
-// KMS encrypt/decrypt operations through the Clef Cloud API.
+// clef-keyservice is a SOPS-compatible gRPC key service that wraps and
+// unwraps DEKs against a PKCS#11 HSM (SoftHSM2, YubiHSM2, Thales Luna,
+// AWS CloudHSM, Nitrokey — any vendor that ships a Cryptoki module).
 //
 // Usage:
 //
-//	clef-keyservice --token <cloud-token> [--endpoint <url>] [--addr <host:port>] [--verbose]
+//	clef-keyservice --pkcs11-module <path> [--addr <host:port>] [--verbose]
 //
-// The binary starts a gRPC server implementing the SOPS KeyService interface.
-// On startup it prints "PORT=<port>" to stdout so the calling process can
-// discover the assigned port (when using :0 for random port assignment).
+// The vendor PKCS#11 library path may be given via --pkcs11-module or the
+// CLEF_PKCS11_MODULE env var. The user PIN, when required, is read from
+// CLEF_PKCS11_PIN or a file pointed at by CLEF_PKCS11_PIN_FILE — never from
+// argv, to keep it out of /proc/<pid>/cmdline.
 //
-// Only AWS KMS key operations are proxied. All other key types (PGP, age,
-// GCP KMS, Azure Key Vault) return gRPC UNIMPLEMENTED, causing SOPS to
-// fall back to local key handling.
+// SOPS carries the target key in KmsKey.arn as a simplified pkcs11: URI:
+//
+//	pkcs11:slot=0;label=clef-dek-wrapper
+//
+// Wrap/unwrap uses CKM_RSA_PKCS_OAEP with SHA-256 against an RSA keypair
+// provisioned on the HSM. All non-KMS SOPS key types return UNIMPLEMENTED
+// so SOPS falls back to local handling for them.
+//
+// On startup the binary prints "PORT=<port>" to stdout so a parent process
+// can discover the port when --addr uses :0.
 package main
 
 import (
@@ -21,9 +30,10 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
-	"github.com/clef-sh/keyservice/internal/cloud"
+	"github.com/clef-sh/keyservice/internal/hsm"
 	"github.com/clef-sh/keyservice/internal/proxy"
 	pb "github.com/getsops/sops/v3/keyservice"
 	"google.golang.org/grpc"
@@ -33,8 +43,7 @@ var version = "dev"
 
 func main() {
 	addr := flag.String("addr", "127.0.0.1:0", "Listen address (host:port). Use :0 for random port.")
-	token := flag.String("token", "", "Clef Cloud bearer token (required)")
-	endpoint := flag.String("endpoint", "https://api.clef.sh", "Clef Cloud API base URL")
+	module := flag.String("pkcs11-module", "", "Path to PKCS#11 module (.so/.dylib/.dll). Falls back to CLEF_PKCS11_MODULE.")
 	verbose := flag.Bool("verbose", false, "Enable debug logging to stderr")
 	showVersion := flag.Bool("version", false, "Print version and exit")
 	flag.Parse()
@@ -44,26 +53,33 @@ func main() {
 		os.Exit(0)
 	}
 
-	// Fall back to CLEF_CLOUD_TOKEN env var (preferred by CLI — avoids token in /proc/<pid>/cmdline)
-	if *token == "" {
-		*token = os.Getenv("CLEF_CLOUD_TOKEN")
+	if *module == "" {
+		*module = os.Getenv("CLEF_PKCS11_MODULE")
 	}
-	if *token == "" {
-		fmt.Fprintln(os.Stderr, "error: --token or CLEF_CLOUD_TOKEN is required")
+	if *module == "" {
+		fmt.Fprintln(os.Stderr, "error: --pkcs11-module or CLEF_PKCS11_MODULE is required")
 		os.Exit(1)
 	}
 
-	// Configure logger
+	pin, err := resolvePIN()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
+	}
+
 	level := slog.LevelInfo
 	if *verbose {
 		level = slog.LevelDebug
 	}
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level}))
 
-	// Create Cloud API client
-	client := cloud.NewClient(*endpoint, *token)
+	backend, err := hsm.NewClient(hsm.Config{ModulePath: *module, PIN: pin})
+	if err != nil {
+		logger.Error("failed to initialize HSM client", "module", *module, "error", err)
+		os.Exit(1)
+	}
+	defer backend.Close()
 
-	// Start gRPC server
 	lis, err := net.Listen("tcp", *addr)
 	if err != nil {
 		logger.Error("failed to listen", "addr", *addr, "error", err)
@@ -71,13 +87,11 @@ func main() {
 	}
 
 	srv := grpc.NewServer()
-	pb.RegisterKeyServiceServer(srv, proxy.NewServer(client, logger))
+	pb.RegisterKeyServiceServer(srv, proxy.NewServer(backend, logger))
 
-	// Print assigned port for the calling process to discover
 	port := lis.Addr().(*net.TCPAddr).Port
 	fmt.Fprintf(os.Stdout, "PORT=%d\n", port)
 
-	// Handle shutdown
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
@@ -86,10 +100,27 @@ func main() {
 		srv.GracefulStop()
 	}()
 
-	logger.Info("key service started", "addr", lis.Addr().String())
+	logger.Info("key service started", "addr", lis.Addr().String(), "module", *module)
 
 	if err := srv.Serve(lis); err != nil {
 		logger.Error("server failed", "error", err)
 		os.Exit(1)
 	}
+}
+
+// resolvePIN reads the HSM user PIN from CLEF_PKCS11_PIN, falling back to
+// the file named by CLEF_PKCS11_PIN_FILE. Returns "" (no login) if neither
+// is set.
+func resolvePIN() (string, error) {
+	if p := os.Getenv("CLEF_PKCS11_PIN"); p != "" {
+		return p, nil
+	}
+	if path := os.Getenv("CLEF_PKCS11_PIN_FILE"); path != "" {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return "", fmt.Errorf("read CLEF_PKCS11_PIN_FILE: %w", err)
+		}
+		return strings.TrimRight(string(data), "\r\n"), nil
+	}
+	return "", nil
 }
