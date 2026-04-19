@@ -16,10 +16,12 @@ build-all:
 		go build $(LDFLAGS) -o bin/$(BINARY)-darwin-arm64 ./cmd/clef-keyservice
 	CGO_ENABLED=1 GOOS=darwin  GOARCH=amd64 CC=$(or $(CC_DARWIN_AMD64),cc) \
 		go build $(LDFLAGS) -o bin/$(BINARY)-darwin-x64 ./cmd/clef-keyservice
-	CGO_ENABLED=1 GOOS=linux   GOARCH=arm64 CC=$(or $(CC_LINUX_ARM64),cc) \
+	CGO_ENABLED=1 GOOS=linux   GOARCH=arm64 CC=$(or $(CC_LINUX_ARM64),aarch64-linux-gnu-gcc) \
 		go build $(LDFLAGS) -o bin/$(BINARY)-linux-arm64 ./cmd/clef-keyservice
 	CGO_ENABLED=1 GOOS=linux   GOARCH=amd64 CC=$(or $(CC_LINUX_AMD64),cc) \
 		go build $(LDFLAGS) -o bin/$(BINARY)-linux-x64 ./cmd/clef-keyservice
+	CGO_ENABLED=1 GOOS=windows GOARCH=amd64 CC=$(or $(CC_WIN32_AMD64),x86_64-w64-mingw32-gcc) \
+		go build $(LDFLAGS) -o bin/$(BINARY)-win32-x64.exe ./cmd/clef-keyservice
 
 # Unit tests (pure Go parts of the hsm package use the `nocgo` tag path-free,
 # the rest still needs cgo because miekg/pkcs11 imports it unconditionally).

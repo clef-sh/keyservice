@@ -41,32 +41,26 @@ jobs:
       matrix:
         include:
           - platform: darwin-arm64
-            goos: darwin
-            goarch: arm64
             os: macos-latest
             bin_name: clef-keyservice
           - platform: darwin-x64
-            goos: darwin
-            goarch: amd64
-            os: macos-latest
+            os: macos-13
             bin_name: clef-keyservice
           - platform: linux-x64
-            goos: linux
-            goarch: amd64
             os: ubuntu-latest
             bin_name: clef-keyservice
           - platform: linux-arm64
-            goos: linux
-            goarch: arm64
-            os: ubuntu-latest
+            os: ubuntu-24.04-arm
             bin_name: clef-keyservice
           - platform: win32-x64
-            goos: windows
-            goarch: amd64
-            os: ubuntu-latest
+            os: windows-latest
             bin_name: clef-keyservice.exe
 
     runs-on: ${{ matrix.os }}
+
+    defaults:
+      run:
+        shell: bash
 
     steps:
       - uses: actions/checkout@v6
@@ -79,8 +73,7 @@ jobs:
 
       - name: Build binary
         env:
-          GOOS: ${{ matrix.goos }}
-          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "1"
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           LDFLAGS="-s -w -X main.version=${VERSION}"
@@ -117,7 +110,7 @@ jobs:
             os: macos-latest
             bin_name: clef-keyservice
           - platform: darwin-x64
-            os: macos-latest
+            os: macos-13
             bin_name: clef-keyservice
           - platform: linux-x64
             os: ubuntu-latest
@@ -196,7 +189,6 @@ jobs:
           Remove-Item "$dir/${asset}.sha256"
 
       - name: Verify binary runs
-        if: matrix.platform != 'linux-arm64' || runner.arch == 'ARM64'
         run: |
           BIN="platforms/keyservice-${{ matrix.platform }}/bin/${{ matrix.bin_name }}"
           "$BIN" --version || "$BIN" --help || true

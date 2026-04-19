@@ -193,14 +193,15 @@ The integration test requires `softhsm2-util` and `pkcs11-tool` (OpenSC) on PATH
 
 ### Cross-compilation targets
 
-| Target | Output |
-|--------|--------|
-| macOS ARM64 (Apple Silicon) | `bin/clef-keyservice-darwin-arm64` |
-| macOS x64 (Intel) | `bin/clef-keyservice-darwin-x64` |
-| Linux x64 | `bin/clef-keyservice-linux-x64` |
-| Linux ARM64 | `bin/clef-keyservice-linux-arm64` |
+| Target | Output | C toolchain required |
+|--------|--------|----------------------|
+| macOS ARM64 (Apple Silicon) | `bin/clef-keyservice-darwin-arm64` | clang (Xcode CLT) |
+| macOS x64 (Intel) | `bin/clef-keyservice-darwin-x64` | clang (Xcode CLT) |
+| Linux x64 | `bin/clef-keyservice-linux-x64` | gcc |
+| Linux ARM64 | `bin/clef-keyservice-linux-arm64` | `aarch64-linux-gnu-gcc` |
+| Windows x64 | `bin/clef-keyservice-win32-x64.exe` | `x86_64-w64-mingw32-gcc` (MinGW) |
 
-Windows is not currently supported (cgo + PKCS#11 on Windows requires per-vendor DLL conventions that are out of scope).
+Because cgo is required, local cross-compilation needs a C cross-compiler for each non-native target (e.g. `brew install mingw-w64` for Windows from macOS, `apt install gcc-aarch64-linux-gnu` for Linux ARM64 from Linux x64). The release pipeline avoids this by building each target natively on its own runner.
 
 ## npm platform packages
 
@@ -212,6 +213,7 @@ Each platform binary is published as a scoped npm package for use as an `optiona
 | `@clef-sh/keyservice-darwin-x64` | macOS x64 |
 | `@clef-sh/keyservice-linux-x64` | Linux x64 |
 | `@clef-sh/keyservice-linux-arm64` | Linux ARM64 |
+| `@clef-sh/keyservice-win32-x64` | Windows x64 |
 
 npm resolves the correct platform package automatically via the `os` and `cpu` fields in each `package.json`.
 
