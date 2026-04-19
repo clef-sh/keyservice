@@ -219,4 +219,4 @@ npm resolves the correct platform package automatically via the `os` and `cpu` f
 
 ## License
 
-[Business Source License 1.1](LICENSE) — see LICENSE for details.
+[MIT](LICENSE)

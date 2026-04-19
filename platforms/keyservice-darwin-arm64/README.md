@@ -20,7 +20,7 @@ published independently of `@clef-sh/core` and `@clef-sh/cli`.
 ## License
 
 The clef-keyservice binary is licensed under the
-[Business Source License 1.1](https://github.com/clef-sh/keyservice/blob/main/LICENSE) (see `LICENSE`).
+[MIT License](https://github.com/clef-sh/keyservice/blob/main/LICENSE).
 
 ## Parent project
 
