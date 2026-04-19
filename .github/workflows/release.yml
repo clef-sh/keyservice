@@ -153,17 +153,14 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      # Node 24 (Active LTS) ships with npm 11.x, which supports
+      # trusted-publisher OIDC auth. Node 22 is stuck on npm 10.x for
+      # its LTS lifecycle, and `npm install -g npm@latest` to upgrade
+      # in place is known to corrupt the module tree on hosted runners.
       - uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: 24
           registry-url: "https://registry.npmjs.org"
-
-      # Node 22 LTS ships with npm 10.x; trusted-publisher OIDC auth
-      # requires npm >= 11.5.1. Without this upgrade, `npm publish` signs
-      # provenance correctly but sends the PUT unauthenticated, and npm's
-      # registry returns a misleading 404 for scoped packages.
-      - name: Upgrade npm for trusted publisher support
-        run: npm install -g npm@latest
 
       - name: Download release binary
         env:
