@@ -43,8 +43,14 @@ jobs:
           - platform: darwin-arm64
             os: macos-latest
             bin_name: clef-keyservice
+          # darwin-x64 cross-builds on the arm64 runner: Apple clang ships
+          # both slices of the SDK, so `clang -arch x86_64` produces a native
+          # x86_64 Mach-O from an arm64 host with no extra toolchain. This
+          # sidesteps the slow macos-13 (Intel) runner queue.
           - platform: darwin-x64
-            os: macos-13
+            os: macos-latest
+            cc: clang -arch x86_64
+            goarch: amd64
             bin_name: clef-keyservice
           - platform: linux-x64
             os: ubuntu-latest
@@ -77,6 +83,12 @@ jobs:
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           LDFLAGS="-s -w -X main.version=${VERSION}"
+          # Apply per-target overrides only when set (keeps native targets
+          # using Go's and the host toolchain's defaults).
+          CC_OVERRIDE="${{ matrix.cc }}"
+          GOARCH_OVERRIDE="${{ matrix.goarch }}"
+          [ -n "$CC_OVERRIDE" ] && export CC="$CC_OVERRIDE"
+          [ -n "$GOARCH_OVERRIDE" ] && export GOARCH="$GOARCH_OVERRIDE"
           go build -ldflags "${LDFLAGS}" -o "${{ matrix.bin_name }}" ./cmd/clef-keyservice
 
       - name: Upload binary to release
@@ -112,8 +124,11 @@ jobs:
           - platform: darwin-arm64
             os: macos-latest
             bin_name: clef-keyservice
+          # darwin-x64 runs under Rosetta 2 (preinstalled on macos-latest),
+          # so the arm64 runner can execute the x86_64 binary for the
+          # --version smoke check. Matches the build job's choice.
           - platform: darwin-x64
-            os: macos-13
+            os: macos-latest
             bin_name: clef-keyservice
           - platform: linux-x64
             os: ubuntu-latest
