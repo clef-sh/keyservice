@@ -118,6 +118,7 @@ jobs:
 
   publish-npm:
     needs: build
+    environment: prod
     strategy:
       matrix:
         include:
@@ -214,7 +215,10 @@ jobs:
           "
 
       - name: Publish to npm
+        # Tokenless: uses npm trusted publishers via OIDC. Each scoped
+        # package (@clef-sh/keyservice-*) must have this repo+workflow
+        # configured as a trusted publisher on npmjs.com. The OIDC
+        # exchange happens inside `npm publish`; the id-token: write
+        # permission at the job level is what makes it possible.
         working-directory: platforms/keyservice-${{ matrix.platform }}
         run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
